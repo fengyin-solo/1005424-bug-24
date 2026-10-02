@@ -18,6 +18,42 @@
       </article>
     </div>
 
+    <section class="linked-ledger">
+      <header class="linked-head">
+        <h3>搬迁安置联动台账（已安置户）</h3>
+        <p class="side-note">
+          由避险搬迁导出收尾驱动：每张安置单导出成功后在此多出一条已安置户。涉及户数口径以搬迁安置单登记值为准，本台账只读镜像、不另存第二份；两处不一致时以安置单为优先口径。
+        </p>
+      </header>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>搬迁编号</th>
+            <th>所属隐患点</th>
+            <th>涉及户数</th>
+            <th>安置地点</th>
+            <th>导出收尾时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in settledHouseholds" :key="`${item.rowId}-${item.code}`">
+            <td>{{ item.code }}</td>
+            <td>{{ item.hazard || '—' }}</td>
+            <!-- 与搬迁侧栏、详情面板同一数据源：保证两处涉及户数一致 -->
+            <td>{{ item.households }}</td>
+            <td>{{ item.location || '—' }}</td>
+            <td>{{ formatTime(item.settledAt) }}</td>
+          </tr>
+          <tr v-if="!settledHouseholds.length">
+            <td colspan="5" class="empty-state">暂无已安置户记录：搬迁安置单导出成功后会自动登记到这里（空态，不产生空包）</td>
+          </tr>
+        </tbody>
+      </table>
+      <footer class="page-foot">
+        <span>已安置户数合计：<strong>{{ settledHouseholdTotal }}</strong>（与避险搬迁页「已安置户数」同值）</span>
+      </footer>
+    </section>
+
     <p class="status-legend">
       <span v-for="item in statusSummary" :key="item.status" class="legend-item">
         {{ item.status }}：{{ item.count }}
@@ -79,7 +115,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
-import type { EntryRow } from '@/data/types'
+import { listSettledHouseholds } from '@/data/relocate-ledger'
+import type { EntryRow, SettledHousehold } from '@/data/types'
 
 const meta = moduleMeta('warning')
 const columns = ["预警编号", "发布对象", "预警级别", "触发雨量", "发布时间", "发布渠道", "解除时间", "预警状态"]
@@ -92,6 +129,25 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+
+// 搬迁导出收尾驱动的已安置户台账：进入本页即读最新结果。
+const settledHouseholds = ref<SettledHousehold[]>([])
+const settledHouseholdTotal = computed(() =>
+  settledHouseholds.value.reduce((sum, item) => sum + item.households, 0),
+)
+
+function formatTime(value: string): string {
+  if (!value) {
+    return '—'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  const pad = (part: number) => String(part).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +184,7 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    settledHouseholds.value = listSettledHouseholds()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预警发布列表读取失败'
   }

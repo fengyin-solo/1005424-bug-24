@@ -69,3 +69,6 @@ npm run build
   `frontend/src/data/seed.ts`。
 - 状态流转只允许在 `local-service.ts` 里改，页面组件不做业务判断。
 - 想回到初始数据：清掉浏览器里 `geohazard-patrol:entries` 这一项，或调用 `resetModule(模块)`。
+- 避险搬迁的导出结果（含预警发布页的「已安置户」联动台账）单独存在
+  `geohazard-patrol:relocate-export-ledger`：重置搬迁模块时会一并清空。涉及户数合法范围为
+  1～9999 的整数，缺失/非法/超范围的安置单不入包、单列待重试；同一搬迁编号重复导出只认第一次结果。

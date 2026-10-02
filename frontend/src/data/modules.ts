@@ -78,6 +78,8 @@ export const MODULES: ModuleMeta[] = [
     actions: ["确认签订", "开始搬迁", "确认完成"],
     actionTargets: {"确认签订": "已签订", "开始搬迁": "搬迁中", "确认完成": "已完成"},
     metrics: ["待签订户数", "搬迁中户数", "已安置户数"],
+    // 环节单向：待签订→已签订→搬迁中→已完成，只能按这个固定次序逐档流转，不允许跳档。
+    orderedFlow: true,
   },
   {
     key: "refuge",

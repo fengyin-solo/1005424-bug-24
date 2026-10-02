@@ -1,4 +1,5 @@
 import { MODULE_BY_KEY } from '@/data/modules'
+import { resetRelocateLedger } from '@/data/relocate-ledger'
 import { allRows, listRows, resetRows, saveRows } from '@/data/local-store'
 import type { ActionResult, EntryRow, ModuleMeta, OverviewResult, PageResult } from '@/data/types'
 
@@ -43,6 +44,17 @@ export function runAction(key: string, id: number, action: string): ActionResult
   if (current === target) {
     return { ok: false, message: `${meta.entity}已经是「${target}」，不用重复操作` }
   }
+  // 单向固定次序的环节（搬迁：待签订→已签订→搬迁中→已完成）只能逐档流转，跳档一律拒绝。
+  if (meta.orderedFlow) {
+    const currentIndex = meta.statuses.indexOf(current)
+    const targetIndex = meta.statuses.indexOf(target)
+    if (currentIndex < 0 || targetIndex !== currentIndex + 1) {
+      return {
+        ok: false,
+        message: `环节只能按 ${meta.statuses.join('→')} 的固定次序流转，当前「${current}」不能直接变为「${target}」`,
+      }
+    }
+  }
   const lastStatus = meta.statuses[meta.statuses.length - 1]
   const updated: EntryRow = {
     ...rows[index],
@@ -58,7 +70,16 @@ export function runAction(key: string, id: number, action: string): ActionResult
 
 export function resetModule(key: string): PageResult {
   resetRows(key)
+  // 搬迁模块重置回示例数据时，导出台账（含预警那边的已安置户镜像）一起清掉，避免旧编号挂账。
+  if (key === 'relocate') {
+    resetRelocateLedger()
+  }
   return listEntries(key)
+}
+
+function csvCell(value: unknown): string {
+  const text = String(value ?? '')
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
 export function exportEntries(key: string): { filename: string; content: string } {
@@ -66,13 +87,23 @@ export function exportEntries(key: string): { filename: string; content: string 
   const header = ['编号', ...meta.fields, '当前状态']
   const lines = [header.join(',')]
   for (const row of listRows(key)) {
-    lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].join(','))
+    // 单行兜异常，不能因为某条脏数据让整包导出报错、把其余记录一起带没。
+    try {
+      lines.push([row.id, ...meta.fields.map((field) => row[field] ?? ''), row.status].map(csvCell).join(','))
+    } catch {
+      lines.push([row.id, ...meta.fields.map(() => ''), '数据异常'].map(csvCell).join(','))
+    }
   }
   return { filename: `${meta.name}-清单.csv`, content: `\uFEFF${lines.join('\n')}` }
 }
 
 export function downloadEntries(key: string): void {
   const { filename, content } = exportEntries(key)
+  downloadCsv(filename, content)
+}
+
+// 通用下载：搬迁模块的整包导出内容由 runRelocateExport 生成（含缺项兜底），走这里落盘。
+export function downloadCsv(filename: string, content: string): void {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
