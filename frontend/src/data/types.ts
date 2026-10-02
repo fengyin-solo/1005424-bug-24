@@ -17,6 +17,8 @@ export type ModuleMeta = {
   statuses: string[]
   actions: string[]
   actionTargets: Record<string, string>
+  // 严格环节模块（如避险搬迁）：动作只能沿 statuses 固定次序单向推进，不允许跨环节、不允许回退。
+  strictFlow?: boolean
   metrics: string[]
 }
 

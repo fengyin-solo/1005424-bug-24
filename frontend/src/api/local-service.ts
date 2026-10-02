@@ -43,6 +43,14 @@ export function runAction(key: string, id: number, action: string): ActionResult
   if (current === target) {
     return { ok: false, message: `${meta.entity}已经是「${target}」，不用重复操作` }
   }
+  // 严格环节模块只能沿状态次序走到紧邻的下一环：跨环节（待签订直接确认完成）与回退都拦下。
+  if (meta.strictFlow) {
+    const currentIndex = meta.statuses.indexOf(current)
+    const targetIndex = meta.statuses.indexOf(target)
+    if (currentIndex < 0 || targetIndex !== currentIndex + 1) {
+      return { ok: false, message: `${meta.entity}环节只能按「${meta.statuses.join('→')}」单向流转，当前「${current}」不能执行「${action}」` }
+    }
+  }
   const lastStatus = meta.statuses[meta.statuses.length - 1]
   const updated: EntryRow = {
     ...rows[index],

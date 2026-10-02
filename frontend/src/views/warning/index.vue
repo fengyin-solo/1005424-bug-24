@@ -63,6 +63,43 @@
       </tbody>
     </table>
 
+    <!-- 搬迁整包导出收尾联动出的台账：一个搬迁编号只认第一次导出，故这里每条编号至多一条已安置户 -->
+    <section class="ledger-panel">
+      <header class="ledger-head">
+        <h3>搬迁安置联动台账</h3>
+        <span class="ledger-summary">
+          已安置户 {{ ledgerSummary.households }} 户 / {{ ledgerRows.length }} 条（由避险搬迁整包导出收尾写入，编号去重）
+        </span>
+      </header>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>搬迁编号</th>
+            <th>所属隐患点</th>
+            <th>已安置户数</th>
+            <th>安置环节</th>
+            <th>来源导出批次</th>
+            <th>导出时间</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in ledgerRows" :key="item.code">
+            <td>{{ item.code }}</td>
+            <td>{{ item.hazardPoint || '—' }}</td>
+            <td>{{ item.households }}</td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.batchId }}</td>
+            <td>{{ item.exportedAt }}</td>
+          </tr>
+          <tr v-if="!ledgerRows.length">
+            <td colspan="6" class="empty-state">
+              暂无联动记录：搬迁安置单整包导出后，状态为「已完成」且涉及户数有效的安置单会在此各生成一条已安置户
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条预警发布记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -79,6 +116,8 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { loadWarningLedger, warningLedgerSummary } from '@/api/relocate-export'
+import type { WarningLedgerEntry } from '@/data/relocate'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('warning')
@@ -90,6 +129,8 @@ const stats = [{"label": "待发布预警", "value": 0}, {"label": "已发布预
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
 const errorMessage = ref('')
+const ledgerRows = ref<WarningLedgerEntry[]>([])
+const ledgerSummary = ref({ count: 0, households: 0 })
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
 const statusSummary = computed(() =>
@@ -128,6 +169,8 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    ledgerRows.value = loadWarningLedger()
+    ledgerSummary.value = warningLedgerSummary()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '预警发布列表读取失败'
   }
@@ -135,3 +178,31 @@ function reload() {
 
 onMounted(reload)
 </script>
+
+<style scoped>
+.ledger-panel {
+  margin-top: 24px;
+  border: 1px solid var(--border-color, #d9dee5);
+  border-radius: 8px;
+  background: var(--surface-color, #fff);
+  padding: 16px;
+}
+
+.ledger-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ledger-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.ledger-summary {
+  font-size: 12px;
+  color: #5a6472;
+}
+</style>

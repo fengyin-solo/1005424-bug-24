@@ -57,3 +57,25 @@ export function resetRows(key: string): EntryRow[] {
 export function storageKey(): string {
   return STORAGE_KEY
 }
+
+// 业务台账（如搬迁导出批次、预警联动台账）按各自 key 独立存取，与业务记录互不干扰。
+export function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return fallback
+  }
+  const raw = window.localStorage.getItem(key)
+  if (!raw) {
+    return fallback
+  }
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
+
+export function writeJson<T>(key: string, value: T): void {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    window.localStorage.setItem(key, JSON.stringify(value))
+  }
+}
